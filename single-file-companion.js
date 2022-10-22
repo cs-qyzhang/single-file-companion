@@ -63,7 +63,9 @@ async function processMessage(message) {
 async function save(message) {
 	const companionOptions = require("./options.json");
 	const filename = path.resolve("../../", (companionOptions.savePath || ""), message.filename);
-	fs.writeFileSync(getFilename(filename), message.content);
+	const destFilename = getFilename(filename);
+	fs.writeFileSync(destFilename, message.content);
+	uploadToOSS(destFilename);
 }
 
 async function externalSave(message) {
@@ -73,7 +75,9 @@ async function externalSave(message) {
 	try {
 		const pageData = await backend.getPageData(message);
 		pageData.filename = path.resolve("../../", (companionOptions.savePath || ""), pageData.filename);
-		fs.writeFileSync(getFilename(pageData.filename), pageData.content);
+		const destFilename = getFilename(pageData.filename);
+		fs.writeFileSync(destFilename, pageData.content);
+		uploadToOSS(destFilename);
 		return pageData;
 	} catch (error) {
 		if (companionOptions.errorFile) {
@@ -101,5 +105,16 @@ function getFilename(filename, index = 1) {
 		return getFilename(filename, index + 1);
 	} else {
 		return newFilename;
+	}
+}
+
+function uploadToOSS(filename) {
+	const execSync = require('child_process').execSync;
+	const out = execSync('picgo upload "' + filename + '"').toString().trim();
+	const lines = out.split(/\r?\n/);
+	if (lines[lines.length - 1].startsWith('https://qyzhang-obsidian.oss-cn-hangzhou.aliyuncs.com')) {
+		execSync('clip', { input: lines[lines.length - 1] });
+	} else {
+		execSync('clip', { input: "single-file-companion error!" });
 	}
 }
