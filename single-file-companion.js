@@ -65,7 +65,9 @@ async function save(message) {
 	const filename = path.resolve("../../", (companionOptions.savePath || ""), message.filename);
 	const destFilename = getFilename(filename);
 	fs.writeFileSync(destFilename, message.content);
-	uploadToOSS(destFilename);
+	const ossUrl = uploadToOSS(destFilename);
+	const url = getOriginUrl(message.content);
+	addRecord({ url: url, oss: ossUrl, file: message.filename });
 }
 
 async function externalSave(message) {
@@ -77,7 +79,9 @@ async function externalSave(message) {
 		pageData.filename = path.resolve("../../", (companionOptions.savePath || ""), pageData.filename);
 		const destFilename = getFilename(pageData.filename);
 		fs.writeFileSync(destFilename, pageData.content);
-		uploadToOSS(destFilename);
+		const ossUrl = uploadToOSS(destFilename);
+		const url = getOriginUrl(pageData.content);
+		addRecord({ url: url, oss: ossUrl, file: pageData.filename });
 		return pageData;
 	} catch (error) {
 		if (companionOptions.errorFile) {
@@ -114,7 +118,27 @@ function uploadToOSS(filename) {
 	const lines = out.split(/\r?\n/);
 	if (lines[lines.length - 1].startsWith('https://qyzhang-obsidian.oss-cn-hangzhou.aliyuncs.com')) {
 		execSync('clip', { input: lines[lines.length - 1] });
+		return lines[lines.length - 1];
 	} else {
 		execSync('clip', { input: "single-file-companion error!" });
+		return "error!";
 	}
+}
+
+function getOriginUrl(content) {
+	const result = content.match(/Page saved with SingleFile \n url: (.*) \n saved date:/);
+	if (result == null) {
+		return "error";
+	} else {
+		return result[1];
+	}
+}
+
+function addRecord(record) {
+	const companionOptions = require("./options.json");
+	const recordFile = companionOptions.savePath + "\\_index.json";
+	const records = require(recordFile);
+	records.push(record);
+	const data = JSON.stringify(records, null, 2);
+	fs.writeFileSync(recordFile, data);
 }
